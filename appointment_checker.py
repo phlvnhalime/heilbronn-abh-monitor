@@ -36,7 +36,7 @@ def scan():
             if counter.inner_text().strip() == "0":
                 category.locator(".counterPlus").click()
             if counter.inner_text().strip() != "1":
-                raise RuntimeError("Hizmet seçimi doğrulanamadı")
+                raise RuntimeError("Could not verify the selected service")
             page.get_by_text("Weiter zur Terminauswahl", exact=True).click()
             page.locator(".ui-datepicker-month").wait_for(state="visible", timeout=20000)
             today = datetime.now(TZ).date()
@@ -80,7 +80,7 @@ def send_telegram(message):
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
     if not token or not chat_id:
-        raise RuntimeError("TELEGRAM_BOT_TOKEN veya TELEGRAM_CHAT_ID .env içinde eksik")
+        raise RuntimeError("TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing")
     response = requests.post(
         f"https://api.telegram.org/bot{token}/sendMessage",
         json={"chat_id": chat_id, "text": message, "disable_web_page_preview": True},
@@ -88,39 +88,45 @@ def send_telegram(message):
     )
     response.raise_for_status()
     if not response.json().get("ok"):
-        raise RuntimeError("Telegram mesajı kabul etmedi")
+        raise RuntimeError("Telegram did not accept the message")
 
 
 def main():
     load_dotenv(Path(__file__).with_name(".env"))
     slots = scan()
     if not slots:
-        print("Doğrulanabilir saat bulunamadı; kayıt değiştirilmedi.")
+        print("No verifiable time slots found; state was not changed.")
         return
     earliest = slots[0]
-    print(f"En erken görünen saat: {earliest[0]} {earliest[1]}")
+    print(f"Earliest visible slot: {earliest[0]} {earliest[1]}")
     previous = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() else None
     current_set = set(slots)
     if previous is None:
-        print("İlk kontrol: başlangıç durumu kaydediliyor, mesaj gönderilmiyor.")
+        print("First check: saving the initial state, no message sent.")
     else:
         old_slots = {tuple(x) for x in previous.get("slots", [])}
         old_earliest = tuple(previous["earliest"])
         if earliest < old_earliest and earliest not in old_slots:
             day = date.fromisoformat(earliest[0])
             days = (day - datetime.now(TZ).date()).days
+            if days == 0:
+                when = "today"
+            elif days == 1:
+                when = "in 1 day"
+            else:
+                when = f"in {days} days"
             message = (
-                "🔔 Heilbronn ABH — Daha erken randevu!\n"
+                "🔔 Heilbronn ABH — earlier appointment available\n"
                 f"📅 {day:%d.%m.%Y}\n"
                 f"🕒 {earliest[1]}\n"
-                f"⏳ {days} gün sonra\n"
-                "Hizmet: Verlängerung Aufenthaltserlaubnis\n"
+                f"⏳ {when}\n"
+                "Service: residence permit extension (Verlängerung Aufenthaltserlaubnis)\n"
                 f"{URL}"
             )
             send_telegram(message)
-            print("Telegram bildirimi gönderildi.")
+            print("Telegram notification sent.")
         else:
-            print("Daha erken yeni randevu yok. Bildirim gönderilmedi.")
+            print("No earlier new appointment. Notification not sent.")
     # Save only after a successful check and any required notification.
     STATE_FILE.write_text(json.dumps({"earliest": list(earliest), "slots": [list(x) for x in sorted(current_set)]}, indent=2))
 
