@@ -2,6 +2,13 @@
 
 This project checks the Heilbronn Ausländerbehörde (ABH) booking page for an earlier residence-permit extension appointment (`Verlängerung Aufenthaltserlaubnis`). When a new slot is earlier than the one already saved, it sends a Telegram message.
 
+> [!IMPORTANT]
+> This tool is intended for personal use and only monitors publicly available appointment information.
+>
+> - It does not automatically book appointments.
+> - Please respect the website's terms of use.
+> - Avoid excessive requests.
+
 The page labels the checker clicks stay in German, because those strings are part of the website. Log lines, errors, and the Telegram text are in English.
 
 ## What the checker does
